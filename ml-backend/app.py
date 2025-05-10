@@ -5,7 +5,7 @@ import joblib
 from tensorflow import keras
 
 # Load saved artifacts
-model = keras.models.load_model("ml-backend/model/model.keras")
+model = keras.models.load_model("ml-backend/model/model_nn.keras")
 scaler = joblib.load("ml-backend/model/scaler.pkl")
 feature_means = joblib.load("ml-backend/model/feature_means.pkl")
 

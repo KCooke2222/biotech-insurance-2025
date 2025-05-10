@@ -6,6 +6,7 @@ This script trains a machine learning model to predict insurance charges based o
 
 import pandas as pd # handles the dataset
 import numpy as np # works with arrays
+import matplotlib.pyplot as plt
 from IPython.display import display # display processed data
 from sklearn.model_selection import train_test_split # splits the dataset into training and testing sets
 from sklearn.preprocessing import StandardScaler # normalizes input data
@@ -15,6 +16,7 @@ from sklearn.metrics import accuracy_score, classification_report # for performa
 from sklearn.preprocessing import LabelEncoder # Convert strings to numbers
 from tensorflow import keras
 from tensorflow.keras import layers
+from tensorflow.keras.callbacks import EarlyStopping
 import joblib # saves the model and scaler for later use
 
 
@@ -22,8 +24,48 @@ file_path = r"ml-backend\insurance.csv" # path to the dataset
 df = pd.read_csv(file_path)
 # reads the csv file into a dataframe so that we can actually read and preprocess
 
+# Permuation importance (meaure importance of features)
+def permutation_importance_manual(model, X, y, metric=mean_absolute_error, n_repeats=5, random_state=42):
+    np.random.seed(random_state)
+    baseline = metric(y, model.predict(X))
+    importances = []
 
+    for i in range(X.shape[1]):
+        scores = []
+        for _ in range(n_repeats):
+            X_permuted = X.copy()
+            shuffled = X_permuted[:, i].copy()
+            np.random.shuffle(shuffled)
+            X_permuted[:, i] = shuffled
+            score = metric(y, model.predict(X_permuted))
+            scores.append(score)
+        mean_score = np.mean(scores)
+        importances.append(mean_score - baseline)
 
+    return np.array(importances)
+
+# Build Keras neural network model
+def build_keras_model():
+    model = keras.Sequential([
+        layers.Input(shape=input_shape),
+        layers.Dense(256, activation='relu'),
+        layers.Dropout(0.2),
+        layers.Dense(128, activation='relu'),
+        layers.Dropout(0.2),
+        layers.Dense(64, activation='relu'),
+        layers.Dense(1)
+    ])
+    model.compile(optimizer='adam', loss='mae')
+    return model
+
+def build_random_forest_model():
+    # train a random forest model
+    model = RandomForestRegressor(n_estimators = 150, random_state=42)
+    model.fit(X_train, y_train)
+
+    return model
+
+# Initilializse data
 # Change charges to integer values
 df['charges'] = df['charges'].astype(int)
 
@@ -54,30 +96,26 @@ print("Input shape: {}".format(input_shape))
 display(df)
 
 
+# Keras model
 r'''
-# train a random forest model
-model = RandomForestRegressor(n_estimators = 150, random_state=42)
-model.fit(X_train, y_train)
-feature_means = X.mean()
+early_stop = EarlyStopping(
+    monitor='val_loss', 
+    patience=10, 
+    restore_best_weights=True
+)
+
+model = build_keras_model()
+history = model.fit(X_train, y_train, epochs=200, batch_size=64, validation_split=0.2)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Val Loss')
+plt.legend()
+plt.title("Training Curve")
+plt.show()
 '''
 
-model = keras.Sequential([
-    layers.Dense(512, activation='relu', input_shape=input_shape),
-    layers.Dense(512, activation='relu'),    
-    layers.Dense(512, activation='relu'),
-    layers.Dense(1),
-])
+# Random forest model
+model = build_random_forest_model()
 
-model.compile(
-    optimizer="adam",
-    loss="mae",
-)
-
-history = model.fit(
-    X_train, y_train,
-    batch_size=32,
-    epochs=1000,
-)
 
 
 
@@ -95,8 +133,19 @@ print(f"MAE: {mae:.2f}") # MAE (Mean Absolute Error): average difference between
 print(f"RMSE: {rmse:.2f}") # RMSE: like MAE, but penalizes large errors more
 print(f"R²: {r2:.2f}") # R² Score: measures how well your model explains variance (closer to 1 is better)
 
+# Get permutation importance
+importances = permutation_importance_manual(model, X_test, y_test)
+sorted_idx = np.argsort(importances)
+plt.figure(figsize=(8, 6))
+plt.barh(np.array(X.columns)[sorted_idx], importances[sorted_idx])
+plt.xlabel("Mean Decrease in MAE")
+plt.title("Permutation Feature Importance")
+plt.tight_layout()
+plt.show()
+
 # Save everything
-model.save("ml-backend/model/model.keras")
+#model.save("ml-backend/model/model_nn.keras") # Keras model
+joblib.dump(model, "ml-backend/model/model_rf.pkl") # random forest model
 joblib.dump(scaler, "ml-backend/model/scaler.pkl")
 joblib.dump(feature_means, "ml-backend/model/feature_means.pkl")
 print("Training complete, model saved.")

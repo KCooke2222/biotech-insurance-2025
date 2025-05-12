@@ -48,11 +48,9 @@ def permutation_importance_manual(model, X, y, metric=mean_absolute_error, n_rep
 def build_keras_model():
     model = keras.Sequential([
         layers.Input(shape=input_shape),
-        layers.Dense(256, activation='relu'),
-        layers.Dropout(0.2),
-        layers.Dense(128, activation='relu'),
-        layers.Dropout(0.2),
-        layers.Dense(64, activation='relu'),
+        layers.Dense(1024, activation='relu'),
+        #layers.Dropout(0.2),
+        layers.Dense(1024, activation='relu'),
         layers.Dense(1)
     ])
     model.compile(optimizer='adam', loss='mae')
@@ -97,7 +95,6 @@ display(df)
 
 
 # Keras model
-r'''
 early_stop = EarlyStopping(
     monitor='val_loss', 
     patience=10, 
@@ -105,16 +102,16 @@ early_stop = EarlyStopping(
 )
 
 model = build_keras_model()
-history = model.fit(X_train, y_train, epochs=200, batch_size=64, validation_split=0.2)
+history = model.fit(X_train, y_train, epochs=200, batch_size=64, callbacks=[early_stop], validation_split=0.2)
 plt.plot(history.history['loss'], label='Train Loss')
 plt.plot(history.history['val_loss'], label='Val Loss')
 plt.legend()
 plt.title("Training Curve")
 plt.show()
-'''
+
 
 # Random forest model
-model = build_random_forest_model()
+#model = build_random_forest_model()
 
 
 
@@ -144,8 +141,8 @@ plt.tight_layout()
 plt.show()
 
 # Save everything
-#model.save("ml-backend/model/model_nn.keras") # Keras model
-joblib.dump(model, "ml-backend/model/model_rf.pkl") # random forest model
+model.save("ml-backend/model/model_nn.keras") # Keras model
+#joblib.dump(model, "ml-backend/model/model_rf.pkl") # random forest model
 joblib.dump(scaler, "ml-backend/model/scaler.pkl")
 joblib.dump(feature_means, "ml-backend/model/feature_means.pkl")
 print("Training complete, model saved.")
